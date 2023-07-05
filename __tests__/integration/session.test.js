@@ -1,11 +1,97 @@
+const request = require("supertest");
+
+const app = require("../../src/app");
+const { User } = require("../../src/app/models");
+const truncate = require("../utils/truncate")
+
 describe("Authentication", () => {
-    it("", () => {
-        const x = 4;
-        const y = 2;
+    beforeEach(async () => {
+        await truncate();
+    })
 
-        const sum = x+ y;
+    it("should authenticate with valid credentials", async () => {
+        const user = await User.create({
+            name: "Leona",
+            email: "leona@teste.com",
+            password: "123456"
+        });
 
-        expect(sum).toBe(6);
+        const response = await request(app)
+            .post('/sessions')
+            .send({
+                email: user.email,
+                password: '123456'
+            });
 
+        expect(response.status).toBe(200);
+    });
+
+    it("should not authenticate with invalid credentials", async () => {
+        const user = await User.create({
+            name: "Leona",
+            email: "leona@teste.com",
+            password: "123456"
+        });
+
+        const response = await request(app)
+            .post('/sessions')
+            .send({
+                email: user.email,
+                password: '123123'
+            });
+
+        expect(response.status).toBe(401);
+    });
+
+    it("should return jwt token when authenticated", async () => {
+        const user = await User.create({
+            name: "Leona",
+            email: "leona@teste.com",
+            password: "123456"
+        });
+
+        const response = await request(app)
+            .post('/sessions')
+            .send({
+                email: user.email,
+                password: '123456'
+            });
+
+        expect(response.body).toHaveProperty("token");
+    },);
+
+    it("should be able to access private routes when authenticated", async () => {
+        const user = await User.create({
+            name: "Leona",
+            email: "leonaceschin@teste.com",
+            password: "123456"
+        });
+
+        const response = await request(app)
+            .get('/dashboard')
+            .set('Authorization', `Bearer ${user.generateToken()}`);
+
+        expect(response.status).toBe(200);
+    });
+
+    it("should not be able to access private routes without jwt token", async () => {
+        const user = await User.create({
+            name: "Leona",
+            email: "leona@teste.com",
+            password: "123123"
+        });
+
+        const response = await request(app)
+            .get('/dashboard');
+
+        expect(response.status).toBe(401);
+    });
+
+    it("should not be able to access private routes with invalid token", async () => {
+        const response = await request(app)
+            .get('/dashboard')
+            .set('Authorization', `Bearer 1231234`);
+
+        expect(response.status).toBe(401);
     });
 });
